@@ -1,6 +1,6 @@
 ## earcut-python
 
-A pure Python port of the earcut JavaScript triangulation library. The latest version is based off of the earcut 2.1.1 release, and is functionally identical.
+A pure Python port of the earcut JavaScript triangulation library. The latest version is based off of the earcut 2.1.2 release, and is functionally identical.
 
 The original project can be found here:
 https://github.com/mapbox/earcut

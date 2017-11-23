@@ -51,7 +51,7 @@ class EarCut(object):
 
         min_x = None
         min_y = None
-        size = None
+        inv_size = None
 
         if has_holes:
             outer_node = self.eliminate_holes(data, hole_indices, outer_node, dim)
@@ -74,9 +74,11 @@ class EarCut(object):
                     max_y = y
 
             # min_x, min_y and size are later used to transform coords into integers for z-order calculation
-            size = max(max_x - min_x, max_y - min_y)
+            inv_size = max(max_x - min_x, max_y - min_y)
 
-        self.earcut_linked(outer_node, triangles, dim, min_x, min_y, size)
+            inv_size = 1 / inv_size if inv_size != 0 else 0
+
+        self.earcut_linked(outer_node, triangles, dim, min_x, min_y, inv_size)
 
         return triangles
 
@@ -119,7 +121,7 @@ class EarCut(object):
                 self.remove_node(p)
                 p = end = p.prev
                 if p == p.next:
-                    return None
+                    break
 
                 again = True
 
@@ -128,7 +130,7 @@ class EarCut(object):
 
         return end
 
-    def earcut_linked(self, ear, triangles, dim, min_x, min_y, size, _pass=None):
+    def earcut_linked(self, ear, triangles, dim, min_x, min_y, inv_size, _pass=None):
         """
         main ear slicing loop which triangulates a polygon (given as a linked _list)
         """
@@ -136,8 +138,8 @@ class EarCut(object):
             return
 
         # interlink polygon nodes in z-order
-        if not _pass and size:
-            self.index_curve(ear, min_x, min_y, size)
+        if not _pass and inv_size:
+            self.index_curve(ear, min_x, min_y, inv_size)
 
         stop = ear
 
@@ -146,7 +148,7 @@ class EarCut(object):
             _prev = ear.prev
             _next = ear.next
 
-            if self.is_ear_hashed(ear, min_x, min_y, size) if size else self.is_ear(ear):
+            if self.is_ear_hashed(ear, min_x, min_y, inv_size) if inv_size else self.is_ear(ear):
                 # cut off the triangle
                 triangles.append(_prev.i // dim)
                 triangles.append(ear.i // dim)
@@ -166,16 +168,16 @@ class EarCut(object):
             if ear == stop:
                 # try filtering points and slicing again
                 if not _pass:
-                    self.earcut_linked(self.filter_points(ear), triangles, dim, min_x, min_y, size, 1)
+                    self.earcut_linked(self.filter_points(ear), triangles, dim, min_x, min_y, inv_size, 1)
 
                     # if this didn't work, try curing all small self-intersections locally
                 elif _pass == 1:
                     ear = self.cure_local_intersections(ear, triangles, dim)
-                    self.earcut_linked(ear, triangles, dim, min_x, min_y, size, 2)
+                    self.earcut_linked(ear, triangles, dim, min_x, min_y, inv_size, 2)
 
                     # as a last resort, try splitting the remaining polygon into two
                 elif _pass == 2:
-                    self.split_earcut(ear, triangles, dim, min_x, min_y, size)
+                    self.split_earcut(ear, triangles, dim, min_x, min_y, inv_size)
 
                 break
 
@@ -200,7 +202,7 @@ class EarCut(object):
 
         return True
 
-    def is_ear_hashed(self, ear, min_x, min_y, size):
+    def is_ear_hashed(self, ear, min_x, min_y, inv_size):
         a = ear.prev
         b = ear
         c = ear.next
@@ -215,8 +217,8 @@ class EarCut(object):
         max_t_y = (a.y if a.y > c.y else c.y) if a.y > b.y else (b.y if b.y > c.y else c.y)
 
         # z-order range for the current triangle bbox;
-        min_z = self.z_order(min_t_x, min_t_y, min_x, min_y, size)
-        max_z = self.z_order(max_t_x, max_t_y, min_x, min_y, size)
+        min_z = self.z_order(min_t_x, min_t_y, min_x, min_y, inv_size)
+        max_z = self.z_order(max_t_x, max_t_y, min_x, min_y, inv_size)
 
         # first look for points inside the triangle in increasing z-order
         p = ear.next_z
@@ -269,7 +271,7 @@ class EarCut(object):
 
         return p
 
-    def split_earcut(self, start, triangles, dim, min_x, min_y, size):
+    def split_earcut(self, start, triangles, dim, min_x, min_y, inv_size):
         """
         try splitting polygon into two and triangulate them independently
         look for a valid diagonal that divides the polygon into two
@@ -291,8 +293,8 @@ class EarCut(object):
                     c = self.filter_points(c, c.next)
 
                     # run earcut on each half
-                    self.earcut_linked(a, triangles, dim, min_x, min_y, size)
-                    self.earcut_linked(c, triangles, dim, min_x, min_y, size)
+                    self.earcut_linked(a, triangles, dim, min_x, min_y, inv_size)
+                    self.earcut_linked(c, triangles, dim, min_x, min_y, inv_size)
                     return
 
                 b = b.next
@@ -353,7 +355,7 @@ class EarCut(object):
         # segment's endpoint with lesser x will be potential connection point
         while do or p != outer_node:
             do = False
-            if p.y >= hy >= p.next.y and p.next.y - p.y != 0:
+            if hy <= p.y and hy >= p.next.y != p.y:
                 x = p.x + (hy - p.y) * (p.next.x - p.x) / (p.next.y - p.y)
 
                 if hx >= x > qx:
@@ -390,7 +392,7 @@ class EarCut(object):
             hx_or_qx = hx if hy < my else qx
             qx_or_hx = qx if hy < my else hx
 
-            if hx >= p.x >= mx and self.point_in_triangle(hx_or_qx, hy, mx, my, qx_or_hx, hy, p.x, p.y):
+            if hx >= p.x >= mx and hx != p.x and self.point_in_triangle(hx_or_qx, hy, mx, my, qx_or_hx, hy, p.x, p.y):
 
                 tan = abs(hy - p.y) / (hx - p.x)  # tangential
 
@@ -402,7 +404,7 @@ class EarCut(object):
 
         return m
 
-    def index_curve(self, start, min_x, min_y, size):
+    def index_curve(self, start, min_x, min_y, inv_size):
         """
         interlink polygon nodes in z-order
         """
@@ -413,7 +415,7 @@ class EarCut(object):
             do = False
 
             if p.z is None:
-                p.z = self.z_order(p.x, p.y, min_x, min_y, size)
+                p.z = self.z_order(p.x, p.y, min_x, min_y, inv_size)
 
             p.prev_z = p.prev
             p.prev_z = p.next
@@ -455,17 +457,7 @@ class EarCut(object):
 
                 while p_size > 0 or (q_size > 0 and q):
 
-                    if p_size == 0:
-                        e = q
-                        q = q.next_z
-                        q_size -= 1
-
-                    elif q_size == 0 or not q:
-                        e = p
-                        p = p.next_z
-                        p_size -= 1
-
-                    elif p.z <= q.z:
+                    if p_size != 0 and (q_size == 0 or not q or p.z <= q.z):
                         e = p
                         p = p.next_z
                         p_size -= 1
@@ -492,14 +484,14 @@ class EarCut(object):
         return _list
 
     @staticmethod
-    def z_order(x, y, min_x, min_y, size):
+    def z_order(x, y, min_x, min_y, inv_size):
         """
-        z-order of a point given coords and size of the data bounding box
+        z-order of a point given coords and inverse of the longer side of data bbox
         coords are transformed into non-negative 15-bit integer range
         """
         #
-        x = 32767 * (x - min_x) // size
-        y = 32767 * (y - min_y) // size
+        x = 32767 * (x - min_x) // inv_size
+        y = 32767 * (y - min_y) // inv_size
 
         x = (x | (x << 8)) & 0x00FF00FF
         x = (x | (x << 4)) & 0x0F0F0F0F
@@ -609,7 +601,8 @@ class EarCut(object):
 
         while do or p != a:
             do = False
-            if ((p.y > py) != (p.next.y > py)) and (px < (p.next.x - p.x) * (py - p.y) / (p.next.y - p.y) + p.x):
+            if (((p.y > py) != (p.next.y > py)) and p.next.y != p.y and
+                    (px < (p.next.x - p.x) * (py - p.y) / (p.next.y - p.y) + p.x)):
                 inside = not inside
 
             p = p.next
