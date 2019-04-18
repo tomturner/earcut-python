@@ -571,7 +571,7 @@ class EarCut(object):
         """
         check if two segments intersect
         """
-        if (self.equals(p1, q1) and self.equals(p2, q2)) or (self.equals(p1, q2) and self.equals(p2, q1)):
+        if (self.equals(p1, p2) and self.equals(q1, q2)) or (self.equals(p1, q2) and self.equals(p2, q1)):
             return True
 
         return (self.area(p1, q1, p2) > 0 != self.area(p1, q1, q2) > 0 and
