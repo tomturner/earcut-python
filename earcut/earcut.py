@@ -1,6 +1,7 @@
 import math
 
 # look at https://github.com/tomturner/earcut-python
+# mirrors JS version https://github.com/mapbox/earcut
 # version 2.1.3
 
 
