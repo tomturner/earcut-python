@@ -1,5 +1,8 @@
 import math
 
+# look at https://github.com/tomturner/earcut-python
+# version 2.1.3
+
 
 class Node(object):
 
@@ -220,23 +223,34 @@ class EarCut(object):
         min_z = self.z_order(min_t_x, min_t_y, min_x, min_y, inv_size)
         max_z = self.z_order(max_t_x, max_t_y, min_x, min_y, inv_size)
 
-        # first look for points inside the triangle in increasing z-order
-        p = ear.next_z
+        p = ear.prev_z
+        n = ear.next_z
 
-        while p and p.z <= max_z:
+        # look for points inside the triangle in both directions
+        while p and p.z >= min_z and n and n.z <= max_z:
             if p != ear.prev and p != ear.next and self.point_in_triangle(a.x, a.y, b.x, b.y, c.x, c.y, p.x,
                                                                           p.y) and self.area(p.prev, p, p.next) >= 0:
                 return False
             p = p.next_z
+            if (n != ear.prev and n != ear.next and self.point_in_triangle(a.x, a.y, b.x, b.y, c.x, c.y, n.x, n.y) and
+                    self.area(n.prev, n, n.next) >= 0):
+                return False
+            n = n.nextZ
 
-        # then look for points in decreasing z-order
-        p = ear.prev_z
-
+        # look for remaining points in decreasing z-order
         while p and p.z >= min_z:
             if p != ear.prev and p != ear.next and self.point_in_triangle(a.x, a.y, b.x, b.y, c.x, c.y, p.x,
                                                                           p.y) and self.area(p.prev, p, p.next) >= 0:
                 return False
             p = p.prev_z
+
+        # look for remaining points in increasing z-order
+        while n and n.z <= max_z:
+            if (n != ear.prev and n != ear.next and
+                self.point_in_triangle(a.x, a.y, b.x, b.y, c.x, c.y, n.x, n.y) and
+                    self.area(n.prev, n, n.next) >= 0):
+                return False
+            n = n.next_z
 
         return True
 
@@ -490,8 +504,8 @@ class EarCut(object):
         coords are transformed into non-negative 15-bit integer range
         """
         #
-        x = 32767 * (x - min_x) // inv_size
-        y = 32767 * (y - min_y) // inv_size
+        x = int(32767 * (x - min_x) * inv_size)
+        y = int(32767 * (y - min_y) * inv_size)
 
         x = (x | (x << 8)) & 0x00FF00FF
         x = (x | (x << 4)) & 0x0F0F0F0F
