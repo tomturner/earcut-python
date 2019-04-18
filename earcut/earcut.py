@@ -2,7 +2,7 @@ import math
 
 # look at https://github.com/tomturner/earcut-python
 # mirrors JS version https://github.com/mapbox/earcut
-# version 2.1.4
+# version 2.1.5
 
 
 class Node(object):
@@ -531,7 +531,7 @@ class EarCut(object):
 
         while do or p != start:
             do = False
-            if p.x < leftmost.x:
+            if p.x < leftmost.x or (p.x == leftmost.x and p.y < leftmost.y):
                 leftmost = p
             p = p.next
 
