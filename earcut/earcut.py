@@ -2,7 +2,7 @@ import math
 
 # look at https://github.com/tomturner/earcut-python
 # mirrors JS version https://github.com/mapbox/earcut
-# version 2.1.3
+# version 2.1.4
 
 
 class Node(object):
@@ -18,7 +18,7 @@ class Node(object):
                  'steiner')
 
     def __init__(self, i, x, y):
-        # vertice index in coordinates array
+        # vertex index in coordinates array
         self.i = i
 
         # vertex coordinates
@@ -26,7 +26,7 @@ class Node(object):
         self.x = x
         self.y = y
 
-        # previous and next vertice nodes in a polygon ring
+        # previous and next vertex nodes in a polygon ring
         self.prev = None
         self.next = None
 
@@ -50,7 +50,7 @@ class EarCut(object):
         outer_node = self.linked_list(data, 0, outer_len, dim, True)
         triangles = []
 
-        if not outer_node:
+        if not outer_node or outer_node.next == outer_node.prev:
             return triangles
 
         min_x = None
@@ -160,7 +160,7 @@ class EarCut(object):
 
                 self.remove_node(ear)
 
-                # skipping the _next vertice leads to less sliver triangles
+                # skipping the next vertex leads to less sliver triangles
                 ear = _next.next
                 stop = _next.next
 
